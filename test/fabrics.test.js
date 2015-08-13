@@ -12,12 +12,11 @@ var assert = require('assert-plus');
 var clone = require('clone');
 var fmt = require('util').format;
 var common = require('./common');
-var libuuid = require('libuuid');
 var test = require('tape').test;
 var vasync = require('vasync');
 
 
-///--- Globals
+// --- Globals
 
 
 // How often to poll for VLAN / networks:
@@ -25,6 +24,7 @@ var CHECK_INTERVAL = 500;
 // Maximum
 var CHECK_TIMEOUT = 30000;
 var CLIENT;
+var CLIENTS;
 var CREATED = {
     nets: [],
     vlans: []
@@ -69,7 +69,8 @@ var TEST_OPTS = {
     skip: !common.getCfg().fabrics_enabled
 };
 
-// --- Functions
+
+// --- Helpers
 
 
 function afterFindInList(t, params, callback, err, req, res, body) {
@@ -260,12 +261,11 @@ function waitForDefaultVLAN(t) {
 
 
 test('setup', TEST_OPTS, function (t) {
-    common.setup(function (err, _client, _server) {
-        t.ifError(err);
-        t.ok(_client);
+    common.setup(function (_, _clients, _server) {
+        CLIENTS = _clients;
+        SERVER  = _server;
 
-        CLIENT = _client;
-        SERVER = _server;
+        CLIENT = _clients.user;
 
         t.end();
     });
@@ -866,25 +866,9 @@ test('teardown', TEST_OPTS, function (tt) {
         });
     });
 
-    tt.test('client teardown', function (t) {
-        CLIENT.teardown(function (err2) {
-            t.ifError(err2, 'client teardown error');
-
-            if (SERVER) {
-                var cli = SERVER._clients;
-                Object.keys(cli).forEach(function (c) {
-                    if (cli[c].client && cli[c].client.close) {
-                        cli[c].client.close();
-                    }
-                });
-                cli.ufds.client.removeAllListeners('close');
-
-                SERVER.close(function () {
-                    return t.end();
-                });
-            } else {
-                t.end();
-            }
+    tt.test('client and server teardown', function (t) {
+        common.teardown(CLIENTS, SERVER, function () {
+            t.end();
         });
     });
 
